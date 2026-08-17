@@ -1383,46 +1383,84 @@ body {
 /* Mobile Devices (Screens < 768px) */
 @media (max-width: 768px) {
   .app-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    padding: 12px 14px;
-  }
-
-  .app-header > .header-left,
-  .app-header > .header-right {
     display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap;
     align-items: center;
-    width: 100%;
+    justify-content: space-between;
+    padding: 10px 14px;
+    gap: 8px;
   }
 
-  .app-header > .header-left {
+  .header-left {
     order: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .header-right {
+    order: 2;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: static !important;
+    margin-left: auto;
+    flex-shrink: 0;
   }
 
   .header-center {
     order: 3;
     width: 100%;
+    margin-top: 2px;
   }
 
-  .header-right {
-    order: 2;
-    width: auto;
-    position: absolute;
-    top: 12px;
-    right: 14px;
+  .brand-tag {
+    display: none;
+  }
+
+  .brand-name {
+    font-size: 16px;
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
+  }
+
+  .connection-status {
+    padding: 4px 8px;
+    font-size: 10.5px;
+  }
+
+  .status-text {
+    display: inline-block;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  .theme-toggle-btn, .settings-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
   }
 
   .scenario-selector-wrap {
     width: 100%;
     justify-content: space-between;
+    padding: 5px 10px;
   }
 
   .preset-dropdown {
     max-width: none;
     flex: 1;
     width: 100%;
+    font-size: 11.5px;
   }
 
   .main-container {
