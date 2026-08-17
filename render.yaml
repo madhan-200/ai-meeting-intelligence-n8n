@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: synapse-meeting-intelligence
+    env: static
+    staticPublishPath: ./web-app
+    pullRequestPreviewsEnabled: true

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SynapseAI &bull; Executive Meeting Intelligence Platform</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Ambient Background Glow Elements -->
+  <div class="glow-orb orb-1"></div>
+  <div class="glow-orb orb-2"></div>
+  <div class="glow-orb orb-3"></div>
+
+  <!-- Hidden File Input for Drag & Drop / Upload -->
+  <input type="file" id="transcriptFileInput" accept=".txt,.vtt,.srt,.json,.md" style="display: none;">
+
+  <!-- Header Navigation -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-logo">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">
+          <span class="brand-name">Synapse<span class="gradient-text">AI</span></span>
+          <span class="brand-tag">Executive Workflow Automation</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-center">
+      <div class="scenario-selector-wrap">
+        <span class="selector-icon">📁</span>
+        <label for="scenarioSelect" class="selector-label">Scenario Preset:</label>
+        <select id="scenarioSelect" class="preset-dropdown">
+          <option value="" disabled selected>-- Select a Sample Meeting --</option>
+          <option value="scenario-1">1. Cloud Migration & Architecture Kickoff (Acme)</option>
+          <option value="scenario-2">2. Product Launch & GTM Strategy (FinTech)</option>
+          <option value="scenario-3">3. Customer Escalation & SLA Remediation (Apex)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="connection-status" id="connectionStatusBadge">
+        <span class="status-dot online"></span>
+        <span class="status-text" id="statusText">n8n Live: Ready</span>
+      </div>
+      <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Light / Dark Mode">☀️</button>
+      <button class="settings-btn" id="settingsToggleBtn" title="Configure Webhook Endpoint">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Settings Modal Drawer -->
+  <div class="settings-drawer" id="settingsDrawer">
+    <div class="drawer-header">
+      <h3>⚙️ Automation Settings</h3>
+      <button class="close-drawer-btn" id="closeDrawerBtn">&times;</button>
+    </div>
+    <div class="drawer-body">
+      <div class="form-group">
+        <label for="webhookUrlInput">Local n8n Webhook Endpoint:</label>
+        <input type="text" id="webhookUrlInput" value="http://localhost:5678/webhook/meeting-summary" class="form-control">
+        <small class="help-text">Use <code>/webhook/</code> for production or <code>/webhook-test/</code> for live canvas testing.</small>
+      </div>
+      <div class="form-group">
+        <label for="engineModeSelect">Execution Mode:</label>
+        <select id="engineModeSelect" class="form-control">
+          <option value="hybrid">Hybrid (Live n8n Webhook with Auto-Fallback)</option>
+          <option value="live_only">Strict Live n8n Webhook Only</option>
+          <option value="simulation">Offline Simulation (Zero Latency Demo)</option>
+        </select>
+      </div>
+      <div class="drawer-actions">
+        <button class="btn btn-secondary flex-1" id="testConnectionBtn">Test Endpoint</button>
+        <button class="btn btn-primary flex-1" id="saveSettingsBtn">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Container -->
+  <main class="main-container">
+    <!-- Left Column: Input & Ingestion Console -->
+    <section class="input-section glass-panel">
+      <div class="panel-header">
+        <div class="panel-title-wrap">
+          <span class="panel-icon">🎙️</span>
+          <h2>Meeting Ingestion</h2>
+        </div>
+        <button class="btn-text" id="clearFormBtn">Reset Form</button>
+      </div>
+
+      <form id="meetingForm" class="meeting-form">
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="meetingTitle">Meeting Title</label>
+            <input type="text" id="meetingTitle" class="form-control" placeholder="e.g. Q3 Architecture Review" required>
+          </div>
+          <div class="form-group flex-1">
+            <label for="clientName">Client / Account</label>
+            <input type="text" id="clientName" class="form-control" placeholder="e.g. Acme Logistics" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="recipientEmail">Stakeholder Recipient Email</label>
+          <input type="email" id="recipientEmail" class="form-control" placeholder="stakeholders@company.com" required>
+        </div>
+
+        <div class="form-group transcript-group">
+          <div class="transcript-header-bar">
+            <label for="transcriptText" class="transcript-label">Meeting Transcript</label>
+            <span class="char-count-badge" id="charCount">0 chars</span>
+          </div>
+          
+          <div class="transcript-toolbar">
+            <button type="button" class="tool-chip" id="uploadFileBtn">
+              <span>📂</span> Upload Transcript
+            </button>
+            <button type="button" class="tool-chip" id="voiceDictateBtn">
+              <span>🎤</span> Voice Dictation
+            </button>
+          </div>
+
+          <div class="dropzone-box" id="dropzoneBox">
+            <textarea id="transcriptText" class="form-control transcript-input" rows="11" placeholder="Paste unstructured meeting notes/transcript, drag & drop a .txt/.vtt file, or use voice dictation..." required></textarea>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-execute" id="executeWorkflowBtn">
+          <span class="btn-sparkle">✨</span>
+          <span class="btn-label" id="btnLabel">Process Transcript with Groq AI</span>
+          <div class="btn-spinner" id="btnSpinner"></div>
+        </button>
+      </form>
+    </section>
+
+    <!-- Right Column: Real-time Intelligence Dashboard -->
+    <section class="output-section glass-panel" id="outputSection">
+      <!-- Empty State -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon-wrap">
+          <div class="empty-icon-pulse">
+            <span class="empty-emoji">🧠</span>
+          </div>
+        </div>
+        <h3>Awaiting Meeting Transcript</h3>
+        <p>Select a preset scenario above, upload a file, or paste a transcript to trigger the n8n AI Agent pipeline powered by Groq Llama 3.3.</p>
+        
+        <div class="empty-action-strip">
+          <button class="btn btn-primary btn-sm" id="quickStartBtn">Load Sample Kickoff Call</button>
+        </div>
+
+        <div class="empty-feature-pills">
+          <span class="feature-tag">⚡ ~1.9s Groq LPU Inference</span>
+          <span class="feature-tag">🎯 Action Items & Priorities</span>
+          <span class="feature-tag">✉️ Responsive HTML Email</span>
+        </div>
+      </div>
+
+      <!-- Live Multi-Step Execution Stepper (Real-time Motion) -->
+      <div class="loading-state hidden" id="loadingState">
+        <div class="stepper-header">
+          <div class="stepper-title-wrap">
+            <span class="stepper-title">⚡ Real-Time Pipeline Orchestration</span>
+            <span class="stepper-sub">n8n LangChain AI Agent &bull; Groq Llama 3.3 70B</span>
+          </div>
+          <span class="stepper-timer-badge" id="stepperTimer">0.0s</span>
+        </div>
+        <div class="stepper-progress-bar-wrap">
+          <div class="stepper-progress-fill" id="stepperProgressFill"></div>
+        </div>
+        
+        <div class="pipeline-stepper" id="pipelineStepper">
+          <div class="step-item" id="step1">
+            <div class="step-icon-badge">1</div>
+            <div class="step-details">
+              <span class="step-label">Ingesting & Sanitizing Context</span>
+              <span class="step-desc">Passing payload through n8n Webhook and Prompt Sanitizer</span>
+            </div>
+          </div>
+          <div class="step-item" id="step2">
+            <div class="step-icon-badge">2</div>
+            <div class="step-details">
+              <span class="step-label">Groq AI Agent Inference (Llama 3.3 70B)</span>
+              <span class="step-desc">Extracting executive entities, assignees, and deadlines</span>
+            </div>
+          </div>
+          <div class="step-item" id="step3">
+            <div class="step-icon-badge">3</div>
+            <div class="step-details">
+              <span class="step-label">Validating Structured Schema</span>
+              <span class="step-desc">Ensuring 100% JSON contract and entity completeness</span>
+            </div>
+          </div>
+          <div class="step-item" id="step4">
+            <div class="step-icon-badge">4</div>
+            <div class="step-details">
+              <span class="step-label">Compiling Responsive HTML Email</span>
+              <span class="step-desc">Building executive email template with inline styles</span>
+            </div>
+          </div>
+          <div class="step-item" id="step5">
+            <div class="step-icon-badge">5</div>
+            <div class="step-details">
+              <span class="step-label">Synchronizing Dashboard</span>
+              <span class="step-desc">Returning real-time payload to client view</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Results Dashboard -->
+      <div class="results-dashboard hidden" id="resultsDashboard">
+        <!-- Results Top Bar -->
+        <div class="results-header">
+          <div class="results-title-group">
+            <span class="badge-client" id="resClientBadge">Acme Global</span>
+            <h3 id="resMeetingTitle">Meeting Intelligence Overview</h3>
+            <div class="results-meta">
+              <span id="resMeetingDate">📅 2026-08-16</span> &bull; 
+              <span id="resAttendees">👥 Alex, Sarah, Marcus</span>
+            </div>
+          </div>
+          <div class="results-actions">
+            <button class="btn-icon" id="exportCsvBtn" title="Export Action Items as CSV">📊 CSV</button>
+            <button class="btn-icon" id="exportMarkdownBtn" title="Export as Markdown Report">📋 MD</button>
+            <button class="btn-icon" id="copyJsonBtn" title="Copy Raw JSON">📦 JSON</button>
+          </div>
+        </div>
+
+        <!-- Metrics KPI Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">Action Items</span>
+            <span class="kpi-value" id="kpiTotalActions">0</span>
+            <span class="kpi-sub" id="kpiHighPriority">0 High Priority</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Key Decisions</span>
+            <span class="kpi-value" id="kpiDecisions">0</span>
+            <span class="kpi-sub">Finalized Agreements</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Risks & Blockers</span>
+            <span class="kpi-value warning" id="kpiBlockers">0</span>
+            <span class="kpi-sub">Flagged Bottlenecks</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Inference Time</span>
+            <span class="kpi-value text-accent" id="kpiInference">1.2s</span>
+            <span class="kpi-sub">Groq Llama 3.3 70B</span>
+          </div>
+        </div>
+
+        <!-- Executive Summary Box -->
+        <div class="summary-card">
+          <div class="summary-card-header">
+            <span class="section-tag">Executive Summary (TL;DR)</span>
+            <span class="sentiment-pill" id="overallSentiment">⚡ Positive Alignment</span>
+          </div>
+          <p class="summary-text" id="resExecutiveSummary">
+            Extracting summary...
+          </p>
+        </div>
+
+        <!-- Dashboard View Tabs -->
+        <div class="tab-nav">
+          <button class="tab-btn active" data-tab="tab-actions">
+            <span>✅ Action Items (<span id="tabActionCount">0</span>)</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-discussion">
+            <span>💬 Discussion Topics</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-decisions">
+            <span>🎯 Decisions & Risks</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-email">
+            <span>✉️ HTML Email Preview</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-raw">
+            <span>🔍 Payload Inspector</span>
+          </button>
+        </div>
+
+        <!-- Tab 1: Action Items -->
+        <div class="tab-pane active" id="tab-actions">
+          <div class="action-filter-bar">
+            <div class="filter-pills">
+              <button class="filter-pill active" data-filter="all">All</button>
+              <button class="filter-pill" data-filter="High">High Priority</button>
+              <button class="filter-pill" data-filter="Medium">Medium</button>
+              <button class="filter-pill" data-filter="Low">Low</button>
+            </div>
+            <div class="action-bar-right">
+              <span class="action-progress-text" id="actionProgressText">0 / 0 Completed</span>
+              <button class="add-task-btn" id="addNewTaskBtn">+ Add Task</button>
+            </div>
+          </div>
+          <div class="action-items-list" id="actionItemsContainer">
+            <!-- Dynamic Action Items Injected Here -->
+          </div>
+        </div>
+
+        <!-- Tab 2: Discussion Topics -->
+        <div class="tab-pane" id="tab-discussion">
+          <div class="discussion-topics-list" id="discussionTopicsContainer">
+            <!-- Discussion Topics Injected Here -->
+          </div>
+        </div>
+
+        <!-- Tab 3: Decisions & Risks -->
+        <div class="tab-pane" id="tab-decisions">
+          <div class="decisions-risks-grid">
+            <div class="sub-panel">
+              <h4>🎯 Finalized Decisions</h4>
+              <ul class="styled-list decisions-list" id="decisionsList"></ul>
+            </div>
+            <div class="sub-panel">
+              <h4>⚠️ Risks & Identified Blockers</h4>
+              <ul class="styled-list blockers-list" id="blockersList"></ul>
+            </div>
+          </div>
+          <div class="next-steps-banner" id="nextStepsBanner">
+            <strong>📌 Next Steps Milestone:</strong> <span id="resNextSteps">TBD</span>
+          </div>
+        </div>
+
+        <!-- Tab 4: HTML Email Preview -->
+        <div class="tab-pane" id="tab-email">
+          <div class="email-preview-toolbar">
+            <span class="email-to-label">To: <strong id="emailRecipientHeader">stakeholders@client.com</strong></span>
+            <div class="email-actions">
+              <button class="btn btn-secondary btn-xs" id="copyHtmlEmailBtn">📋 Copy Email HTML</button>
+              <button class="btn btn-primary btn-xs" id="openEmailClientBtn">📧 Open in Email Client</button>
+            </div>
+          </div>
+          <div class="email-preview-frame-wrap">
+            <iframe id="emailPreviewFrame" class="email-preview-frame"></iframe>
+          </div>
+        </div>
+
+        <!-- Tab 5: Raw JSON Payload -->
+        <div class="tab-pane" id="tab-raw">
+          <div class="json-viewer-wrap">
+            <pre><code id="jsonCodeViewer">{}</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Floating Toast Notification -->
+  <div class="toast-notification" id="toastNotification">
+    <span class="toast-icon">✓</span>
+    <span class="toast-message" id="toastMessage">Action completed</span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

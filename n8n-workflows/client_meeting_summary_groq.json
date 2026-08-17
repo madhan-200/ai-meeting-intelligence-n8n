@@ -1,0 +1,182 @@
+{
+  "name": "AI Client Meeting Summaries & Action Items (Groq Llama 3.3 - AI Agent)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "meeting-summary",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-trigger",
+      "name": "Webhook: Ingest Transcript",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "meeting-summary-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sanitize and structure the input parameters\nconst body = $input.first().json.body || $input.first().json;\n\nconst rawTranscript = body.transcript || '';\nconst meetingTitle = body.meeting_title || 'Client Executive Sync';\nconst clientName = body.client_name || 'Valued Client';\nconst recipientEmail = body.recipient_email || 'stakeholders@client.com';\n\nif (!rawTranscript || rawTranscript.trim().length < 20) {\n  throw new Error('Transcript is required and must contain at least 20 characters.');\n}\n\nconst userPrompt = `Analyze the following meeting transcript and extract structured meeting intelligence.\n\nMeeting Title: ${meetingTitle}\nClient: ${clientName}\nTarget Recipient: ${recipientEmail}\n\nRAW TRANSCRIPT:\n\"\"\"\n${rawTranscript}\n\"\"\"\n\nReturn ONLY a valid JSON object matching the required schema with keys: meeting_title, client_name, meeting_date, attendees, executive_summary, key_discussion_points, action_items, key_decisions, risks_and_blockers, next_steps_timeline.`;\n\nreturn {\n  json: {\n    meeting_title: meetingTitle,\n    client_name: clientName,\n    recipient_email: recipientEmail,\n    rawTranscript: rawTranscript,\n    userPrompt: userPrompt\n  }\n};"
+      },
+      "id": "node-sanitize-input",
+      "name": "Sanitize & Prepare Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.userPrompt }}",
+        "options": {
+          "systemMessage": "=You are an expert Executive Meeting Intelligence and Process Automation AI.\nYour task is to analyze the provided meeting transcript and extract structured, professional business intelligence.\n\nCRITICAL EXTRACTION RULES:\n1. Output MUST be 100% valid JSON matching the exact schema below without any markdown fences (no ```json or ```), conversational filler, or commentary.\n2. 'executive_summary': A crisp, executive-grade 3-4 sentence paragraph highlighting primary objectives, alignments, and project health.\n3. 'key_discussion_points': Array of objects with 'topic', 'summary', and 'sentiment' ('Positive' | 'Neutral' | 'Urgent' | 'Concerned').\n4. 'action_items': Array of objects with:\n   - 'id': e.g., 'ACT-1', 'ACT-2'\n   - 'task': clear actionable deliverable\n   - 'assignee': person or team name (use 'Unassigned' if not mentioned)\n   - 'due_date': specific date or timeframe mentioned\n   - 'priority': 'High' | 'Medium' | 'Low'\n   - 'status': 'Pending'\n5. 'key_decisions': Array of strings representing finalized agreements.\n6. 'risks_and_blockers': Array of strings representing flagged concerns or bottlenecks.\n7. 'next_steps_timeline': String summarizing the immediate next follow-up milestone."
+        }
+      },
+      "id": "node-ai-agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 3000
+        }
+      },
+      "id": "node-groq-chat-model",
+      "name": "Groq Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [740, 520],
+      "credentials": {
+        "groqApi": {
+          "id": "YOUR_GROQ_CREDENTIAL_ID",
+          "name": "Groq API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst prevInput = $('Sanitize & Prepare Prompt').first().json;\n\n// AI Agent outputs the response in 'output' or 'text'\nlet rawContent = item.output || item.text || item;\n\nif (typeof rawContent === 'object' && rawContent.output) {\n  rawContent = rawContent.output;\n}\n\nlet content;\nif (typeof rawContent === 'string') {\n  // Strip markdown code fences if LLM wrapped it\n  let cleaned = rawContent.trim();\n  if (cleaned.startsWith('```json')) {\n    cleaned = cleaned.replace(/^```json\\s*/, '').replace(/\\s*```$/, '');\n  } else if (cleaned.startsWith('```')) {\n    cleaned = cleaned.replace(/^```\\s*/, '').replace(/\\s*```$/, '');\n  }\n  \n  try {\n    content = JSON.parse(cleaned);\n  } catch (err) {\n    throw new Error('Failed to parse AI Agent JSON output: ' + err.message + ' | Raw: ' + cleaned.substring(0, 150));\n  }\n} else {\n  content = rawContent;\n}\n\n// Ensure schema integrity\nconst structuredData = {\n  meeting_title: content.meeting_title || prevInput.meeting_title,\n  client_name: content.client_name || prevInput.client_name,\n  meeting_date: content.meeting_date || new Date().toISOString().split('T')[0],\n  attendees: Array.isArray(content.attendees) ? content.attendees : ['Project Stakeholders'],\n  executive_summary: content.executive_summary || 'No summary generated.',\n  key_discussion_points: Array.isArray(content.key_discussion_points) ? content.key_discussion_points : [],\n  action_items: Array.isArray(content.action_items) ? content.action_items : [],\n  key_decisions: Array.isArray(content.key_decisions) ? content.key_decisions : [],\n  risks_and_blockers: Array.isArray(content.risks_and_blockers) ? content.risks_and_blockers : [],\n  next_steps_timeline: content.next_steps_timeline || 'TBD'\n};\n\nconst highPriorityCount = structuredData.action_items.filter(item => item.priority === 'High').length;\n\nreturn {\n  json: {\n    structured_data: structuredData,\n    recipient_email: prevInput.recipient_email,\n    stats: {\n      total_action_items: structuredData.action_items.length,\n      high_priority_items: highPriorityCount,\n      decisions_count: structuredData.key_decisions.length\n    }\n  }\n};"
+      },
+      "id": "node-parse-json",
+      "name": "Parse & Validate Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst data = item.structured_data;\nconst stats = item.stats;\n\n// Generate a responsive corporate HTML email template with inline styles\nconst actionRows = data.action_items.map((act, index) => {\n  const badgeColor = act.priority === 'High' ? '#e11d48' : act.priority === 'Medium' ? '#d97706' : '#059669';\n  const badgeBg = act.priority === 'High' ? '#ffe4e6' : act.priority === 'Medium' ? '#fef3c7' : '#d1fae5';\n  return `\n    <tr style=\"border-bottom: 1px solid #e2e8f0;\">\n      <td style=\"padding: 12px 14px; font-weight: 600; color: #1e293b;\">${index + 1}. ${act.task}</td>\n      <td style=\"padding: 12px 14px; color: #475569;\"><strong style=\"color: #0f172a;\">${act.assignee}</strong></td>\n      <td style=\"padding: 12px 14px; color: #475569;\">${act.due_date}</td>\n      <td style=\"padding: 12px 14px;\">\n        <span style=\"background-color: ${badgeBg}; color: ${badgeColor}; padding: 3px 8px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase;\">\n          ${act.priority}\n        </span>\n      </td>\n    </tr>\n  `;\n}).join('');\n\nconst decisionsList = data.key_decisions.map(d => `<li style=\"margin-bottom: 6px; color: #334155;\">${d}</li>`).join('');\nconst blockersList = data.risks_and_blockers.map(b => `<li style=\"margin-bottom: 6px; color: #dc2626;\">${b}</li>`).join('');\n\nconst htmlEmail = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n</head>\n<body style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;\">\n  <div style=\"max-width: 680px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;\">\n    <!-- Header Banner -->\n    <div style=\"background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 28px 32px; color: #ffffff;\">\n      <div style=\"font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.85; margin-bottom: 6px;\">${data.client_name} &bull; Meeting Intelligence</div>\n      <h1 style=\"margin: 0; font-size: 22px; font-weight: 700; color: #ffffff;\">${data.meeting_title}</h1>\n      <div style=\"font-size: 13px; opacity: 0.9; margin-top: 8px;\">📅 Date: ${data.meeting_date} &bull; 👥 Attendees: ${data.attendees.join(', ') || 'Project Stakeholders'}</div>\n    </div>\n\n    <!-- Content Container -->\n    <div style=\"padding: 28px 32px;\">\n      <!-- Executive Summary -->\n      <div style=\"background-color: #f1f5f9; border-left: 4px solid #4f46e5; border-radius: 6px; padding: 16px 20px; margin-bottom: 24px;\">\n        <h3 style=\"margin: 0 0 8px 0; color: #1e293b; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;\">Executive Summary</h3>\n        <p style=\"margin: 0; color: #334155; line-height: 1.6; font-size: 14px;\">${data.executive_summary}</p>\n      </div>\n\n      <!-- Action Items Table -->\n      <div style=\"margin-bottom: 28px;\">\n        <h3 style=\"margin: 0 0 12px 0; color: #0f172a; font-size: 16px; font-weight: 700;\">Action Items & Deliverables (${stats.total_action_items})</h3>\n        <table style=\"width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;\">\n          <thead>\n            <tr style=\"background-color: #f8fafc; border-bottom: 2px solid #cbd5e1;\">\n              <th style=\"padding: 10px 14px; color: #475569; font-weight: 600;\">Task Description</th>\n              <th style=\"padding: 10px 14px; color: #475569; font-weight: 600;\">Owner</th>\n              <th style=\"padding: 10px 14px; color: #475569; font-weight: 600;\">Due Date</th>\n              <th style=\"padding: 10px 14px; color: #475569; font-weight: 600;\">Priority</th>\n            </tr>\n          </thead>\n          <tbody>\n            ${actionRows || '<tr><td colspan=\"4\" style=\"padding: 12px; text-align: center; color: #94a3b8;\">No direct action items identified.</td></tr>'}\n          </tbody>\n        </table>\n      </div>\n\n      <!-- Decisions & Blockers Grid -->\n      <div style=\"display: table; width: 100%; margin-bottom: 24px;\">\n        <div style=\"display: table-cell; width: 50%; vertical-align: top; padding-right: 12px;\">\n          <h4 style=\"margin: 0 0 8px 0; color: #0f172a; font-size: 14px;\">✅ Key Decisions Made</h4>\n          <ul style=\"margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5;\">\n            ${decisionsList || '<li style=\"color: #94a3b8;\">No major structural decisions finalized.</li>'}\n          </ul>\n        </div>\n        <div style=\"display: table-cell; width: 50%; vertical-align: top; padding-left: 12px;\">\n          <h4 style=\"margin: 0 0 8px 0; color: #0f172a; font-size: 14px;\">⚠️ Risks & Identified Blockers</h4>\n          <ul style=\"margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5;\">\n            ${blockersList || '<li style=\"color: #94a3b8;\">No immediate blockers noted.</li>'}\n          </ul>\n        </div>\n      </div>\n\n      <!-- Next Steps Callout -->\n      <div style=\"background-color: #faf5ff; border: 1px dashed #c084fc; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;\">\n        <strong style=\"color: #6b21a8; font-size: 13px;\">📌 Next Milestone & Follow-up:</strong>\n        <span style=\"color: #581c87; font-size: 13px; margin-left: 6px;\">${data.next_steps_timeline}</span>\n      </div>\n    </div>\n\n    <!-- Footer -->\n    <div style=\"background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 32px; text-align: center; color: #94a3b8; font-size: 12px;\">\n      Automated via n8n & Groq AI &bull; Meeting Intelligence Platform &bull; Deliverables Tracked\n    </div>\n  </div>\n</body>\n</html>\n`;\n\nreturn {\n  json: {\n    status: 'success',\n    data: data,\n    email_html: htmlEmail,\n    recipient_email: item.recipient_email,\n    stats: stats,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "node-generate-html-email",
+      "name": "Generate HTML Email Template",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "content": "## 🎙️ AI Agent Meeting Intelligence Pipeline\n1. **Webhook:** Ingests transcript & metadata.\n2. **Sanitize & Prepare:** Prepares user prompt with context.\n3. **AI Agent + Groq:** Uses LangChain Agent architecture with Llama 3.3 70B.\n4. **Validate Schema:** Parses `$json.output` and guarantees JSON contract.\n5. **Generate Email:** Compiles responsive HTML template with inline styles.\n6. **Respond:** Returns real-time payload to frontend dashboard.",
+        "height": 260,
+        "width": 1460,
+        "color": 4
+      },
+      "id": "sticky-note-documentation",
+      "name": "Sticky Note: Workflow Architecture",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 80]
+    }
+  ],
+  "connections": {
+    "Webhook: Ingest Transcript": {
+      "main": [
+        [
+          {
+            "node": "Sanitize & Prepare Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sanitize & Prepare Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse & Validate Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Validate Schema": {
+      "main": [
+        [
+          {
+            "node": "Generate HTML Email Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate HTML Email Template": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
