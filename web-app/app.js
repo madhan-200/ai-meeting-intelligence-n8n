@@ -359,9 +359,17 @@ function toggleTheme() {
 
 function loadSavedSettings() {
   const savedWebhook = localStorage.getItem('synapse_webhook_url');
+  const savedMode = localStorage.getItem('synapse_engine_mode');
   if (savedWebhook) {
     state.settings.webhookUrl = savedWebhook;
     elements.webhookUrlInput.value = savedWebhook;
+  }
+  if (savedMode) {
+    state.settings.mode = savedMode;
+    elements.engineModeSelect.value = savedMode;
+  } else {
+    state.settings.mode = 'hybrid';
+    elements.engineModeSelect.value = 'hybrid';
   }
 }
 
@@ -671,7 +679,12 @@ async function processTranscript() {
       } catch (liveErr) {
         console.warn('Live Webhook Error:', liveErr);
         if (state.settings.mode === 'live_only') {
-          throw new Error(`Cannot reach n8n at ${state.settings.webhookUrl}. Make sure your local n8n is running.`);
+          const isLocalhost = state.settings.webhookUrl.includes('localhost') || state.settings.webhookUrl.includes('127.0.0.1');
+          const isRemote = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+          if (isLocalhost && isRemote) {
+            throw new Error(`Cannot reach 'localhost' from this mobile device. Your n8n server is running on your laptop. Set Execution Mode to 'Hybrid' or 'Offline Simulation' in Settings (⚙️) to run on mobile.`);
+          }
+          throw new Error(`Cannot reach n8n at ${state.settings.webhookUrl}. Ensure your n8n workflow is active.`);
         }
         // Auto-Fallback in Hybrid Mode
         await simulateDelay(400);
@@ -1111,6 +1124,7 @@ function saveSettings() {
   state.settings.webhookUrl = elements.webhookUrlInput.value.trim();
   state.settings.mode = elements.engineModeSelect.value;
   localStorage.setItem('synapse_webhook_url', state.settings.webhookUrl);
+  localStorage.setItem('synapse_engine_mode', state.settings.mode);
   elements.settingsDrawer.classList.remove('active');
   showToast('Settings saved successfully!');
 }
