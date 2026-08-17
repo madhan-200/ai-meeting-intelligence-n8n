@@ -650,7 +650,10 @@ async function processTranscript() {
       try {
         const response = await fetch(state.settings.webhookUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Bypass-Tunnel-Reminder': 'true'
+          },
           body: JSON.stringify(payload)
         });
 
@@ -1118,7 +1121,10 @@ async function testWebhookEndpoint() {
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Bypass-Tunnel-Reminder': 'true'
+      },
       body: JSON.stringify({ test: true, ping: 'health_check' })
     });
     if (res.ok) {
